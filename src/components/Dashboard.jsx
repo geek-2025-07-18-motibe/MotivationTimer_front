@@ -5,14 +5,14 @@ import '../assets/Dashboard.css';
 // 秒数を「X時間Y分」の形式に変換するヘルパー関数 (変更なし)
 const formatTime = (totalSeconds) => {
     if (totalSeconds === 0) {
-        return <>0<span className="fs-5 fw-normal ms-1">時間</span></>;
+        return <>0<span className="fs-5 fw-normal ms-1">hour</span></>;
     }
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     return (
         <>
-            {hours > 0 && <>{hours}<span className="fs-5 fw-normal ms-1">時間</span></>}
-            {minutes > 0 && <>{minutes}<span className="fs-5 fw-normal ms-1">分</span></>}
+            {hours > 0 && <>{hours}<span className="fs-5 fw-normal ms-1">h</span></>}
+            {minutes > 0 && <>{minutes}<span className="fs-5 fw-normal ms-1">m</span></>}
         </>
     );
 };
@@ -22,38 +22,23 @@ const toYYYYMMDD = (date) => {
     return date.toISOString().split('T')[0];
 };
 
+const formatYAxisLabel = (totalSeconds) => {
+    if (totalSeconds === 0) return '0 m';
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+    const parts = [];
+    if (hours > 0) parts.push(`${hours} h`);
+    if (minutes > 0) parts.push(`${minutes} m`);
+    return parts.join(' ');
+};
+
 const Dashboard = ({ data }) => {
-    // useMemoを使って、dataが変更された時だけ再計算する
-    const summary = useMemo(() => {
-        const now = new Date(); // 現在時刻を基準にする
-        const todayStr = toYYYYMMDD(now);
-        const thisMonthStr = now.toISOString().substring(0, 7);
-
-        let totalSeconds = 0;
-        let todaySeconds = 0;
-        let monthSeconds = 0;
-        const dailyTotals = {}; // 日付ごとの学習時間を格納するオブジェクト
-
-        data.forEach(item => {
-            const itemDateStr = item.created_at.split('T')[0];
-            totalSeconds += item.timer_time;
-            if (itemDateStr === todayStr) {
-                todaySeconds += item.timer_time;
-            }
-            if (item.created_at.startsWith(thisMonthStr)) {
-                monthSeconds += item.timer_time;
-            }
-            dailyTotals[itemDateStr] = (dailyTotals[itemDateStr] || 0) + item.timer_time;
-        });
-
-        return { totalSeconds, todaySeconds, monthSeconds, dailyTotals };
-    }, [data]);
-
-    // グラフのX軸に表示する直近7日間の日付を動的に生成
+    // グラフのX軸に表示する直近7日間の日付を先に生成
     const chartDates = useMemo(() => {
         const dates = [];
         const today = new Date();
-        const dayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+        const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         for (let i = 6; i >= 0; i--) {
             const date = new Date(today);
             date.setDate(today.getDate() - i);
@@ -65,38 +50,67 @@ const Dashboard = ({ data }) => {
         return dates;
     }, []);
 
-    // グラフのバーの高さを計算する関数
+    const summary = useMemo(() => {
+        const now = new Date();
+        const todayStr = toYYYYMMDD(now);
+        const thisMonthStr = now.toISOString().substring(0, 7);
+
+        let totalSeconds = 0;
+        let todaySeconds = 0;
+        let monthSeconds = 0;
+        const dailyTotals = {};
+
+        data.forEach(item => {
+            const itemDateStr = item.created_at.split('T')[0];
+            totalSeconds += item.timer_time;
+            if (itemDateStr === todayStr) todaySeconds += item.timer_time;
+            if (item.created_at.startsWith(thisMonthStr)) monthSeconds += item.timer_time;
+            dailyTotals[itemDateStr] = (dailyTotals[itemDateStr] || 0) + item.timer_time;
+        });
+
+        // 1. グラフに表示される7日間の最大学習時間を探す
+        const maxDailySecondsInView = chartDates.reduce((max, day) => {
+            const dailyTime = dailyTotals[day.dateKey] || 0;
+            return Math.max(max, dailyTime);
+        }, 0);
+
+        // 2. 最大学習時間から、グラフのY軸の最大値を決定する (30分単位で切り上げ)
+        //    学習が全くない場合は、デフォルトで1時間(3600秒)とする
+        let chartMaxSeconds = 3600; // デフォルト値
+        if (maxDailySecondsInView > 0) {
+            const halfHour = 1800; // 30分 = 1800秒
+            chartMaxSeconds = Math.ceil(maxDailySecondsInView / halfHour) * halfHour;
+        }
+
+        return { totalSeconds, todaySeconds, monthSeconds, dailyTotals, chartMaxSeconds };
+    }, [data, chartDates]);
+
+    // Y軸のラベルを動的に生成
+    const yAxisLabels = useMemo(() => {
+        const max = summary.chartMaxSeconds;
+        const labels = [max, max * 0.75, max * 0.5, max * 0.25].map((seconds, index) => (
+            <span key={index}>{formatYAxisLabel(seconds)}</span>
+        ));
+        labels.push(<span key="zero">{formatYAxisLabel(0)}</span>);
+        return labels;
+    }, [summary.chartMaxSeconds]);
+
+    // グラフのバーの高さを計算する関数 (動的な最大値を使用)
     const getBarHeight = (dateKey) => {
         const dailySeconds = summary.dailyTotals[dateKey] || 0;
-        const maxSeconds = 2 * 3600; // グラフの最大値: 2時間
-        const heightPercentage = Math.min((dailySeconds / maxSeconds) * 100, 100);
+        // 分母を動的な最大値に変更
+        const heightPercentage = Math.min((dailySeconds / summary.chartMaxSeconds) * 100, 100);
         return `${heightPercentage}%`;
     };
 
     return (
         <div className="container py-5">
             {/* 上部のサマリーカード */}
-            <div className="row g-4 mb-5">
+            <div className="row g-4 mb-5 justify-content-center">
                 <div className="col-lg-4">
                     <div className="card stat-card shadow-sm">
                         <div className="card-body text-center p-4">
-                            <p className="card-title text-muted">今日</p>
-                            <h2 className="fw-bold">{formatTime(summary.todaySeconds)}</h2>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-lg-4">
-                    <div className="card stat-card shadow-sm">
-                        <div className="card-body text-center p-4">
-                            <p className="card-title text-muted">今月</p>
-                            <h2 className="fw-bold">{formatTime(summary.monthSeconds)}</h2>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-lg-4">
-                    <div className="card stat-card shadow-sm">
-                        <div className="card-body text-center p-4">
-                            <p className="card-title text-muted">総学習時間</p>
+                            <p className="card-title text-muted">Total Time</p>
                             <h2 className="fw-bold">{formatTime(summary.totalSeconds)}</h2>
                         </div>
                     </div>
@@ -107,8 +121,8 @@ const Dashboard = ({ data }) => {
             <div className="card stat-card shadow-sm">
                 <div className="card-body p-4">
                     <div className="d-flex">
-                        <div className="y-axis-labels">
-                            <span>2時間</span><span>1時間30分</span><span>1時間</span><span>30分</span><span>0分</span>
+                    <div className="y-axis-labels">
+                            {yAxisLabels}
                         </div>
                         <div className="flex-grow-1">
                             <div className="chart-container">

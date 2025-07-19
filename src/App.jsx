@@ -5,13 +5,13 @@ import Login from './pages/Login';
 import { Routes, Route } from 'react-router-dom';
 import Register from './pages/Register';
 import MyPage from './pages/MyPage';
+import TopPage from './pages/TopPage';
+
 import LoginModal from './components/Modal/LoginModal';
 import RegisterModal from './components/Modal/RegisterModal';
-
 import ErrorModal from './components/Modal/ErrorModal';
+
 import { fetchCurrentUser, handleLogin, handleRegister  } from "./apiHandlers";
-import LoginButton from './components/LoginButton';
-import RegisterButton from './components/RegisterButton';
 
 function App() {
   const [errorMsg, setErrorMsg] = useState("");
@@ -23,7 +23,7 @@ function App() {
   return (
     <div>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<TopPage />} />
         <Route path="/timer" element={<Timer />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="/login" element={<Login />} />

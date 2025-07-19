@@ -27,31 +27,26 @@ const MyPage = () => {
 
   return (
     <div className="container py-5">
-
-      <div className="card text-center p-4 p-md-5 mb-5 shadow-sm">
-        <div className="card-body">
-          <h3 className="card-title mb-3">
-            こんにちは、{user ? user.name : 'ゲスト'}さん！
-          </h3>
-          <p className="card-text text-muted mb-4">
-            今日も目標に向かって頑張りましょう！
-          </p>
-          <button 
-            onClick={() => navigate('/timer')} 
-            className="btn btn-primary btn-lg rounded-pill px-5"
-          >
-            <i className="bi bi-play-circle me-2"></i>
-            学習タイマーを開始
-          </button>
-        </div>
+      <div className="row justify-content-center">
+      <div className="col-lg-8 col-md-10">
+      <div className="text-center mb-5">
+        <button 
+          onClick={() => navigate('/timer')} 
+          className="btn btn-dark btn-lg rounded-pill px-5"
+        >
+          <i className="bi bi-play-circle me-2"></i>
+          Go to Timer
+        </button>
       </div>
 
-      <h2 className="mb-4 fw-bold">学習の記録</h2>
+      <h2 className="mb-4 fw-bold">Learning Record</h2>
       <Dashboard data={logs} />
 
       <div className="mt-5">
-        <h2 className="mb-4 fw-bold">タイムライン</h2>
+        <h2 className="mb-4 fw-bold">Timeline</h2>
         <Timeline logs={logs} />
+      </div>
+      </div>
       </div>
     </div>
   );
